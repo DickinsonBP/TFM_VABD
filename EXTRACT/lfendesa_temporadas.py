@@ -44,7 +44,7 @@ def extract_data(temporada):
             season_data.append([temporada] + cols)
 
     return season_data
-
+# TODO: Hacer bucle por todas las ligas y extraer todas las temporadas
 for temporada in temporadas:
     print(f"Extrayendo temporada {temporada}...")
     temporada_select = Select(driver.find_element(By.ID, "_ctl0_temporadasDropDownList"))
