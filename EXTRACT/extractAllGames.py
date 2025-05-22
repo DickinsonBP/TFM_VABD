@@ -3,6 +3,9 @@ import GetAllLeagueCommon
 import GetAllLeagueBothPlata
 from importlib import reload
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def extractStats(division, season, targetTeam, jorFirst, jorLast, sDir, chromeDriver):
     print(division)
@@ -134,7 +137,7 @@ def extractStats(division, season, targetTeam, jorFirst, jorLast, sDir, chromeDr
         GetAllLeagueCommon.extractStatisticsAllLeague(html_doc, 'Liga'+division.replace(',','-'), season, jorFirst, jorLast, division.split(',')[1], sDir, chromeDriver, 1, '', False, division, '', '', 'Castellano', False)
     reload(GetAllLeagueCommon)
 
-path = 'D:/Master/BueStats/BuStats-master/'
+path = os.getenv("CSV_OUT")
 
 jornadas = {
     2024 : 30,
