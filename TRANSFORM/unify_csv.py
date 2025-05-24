@@ -21,7 +21,7 @@ def unify_csv(csv_path=None, out_path=None):
                         aux = aux[cols]
                         df = pd.concat([df, aux], ignore_index=True)
         # do transformations
-        df["Nombre"] = df["Nombre"].astype(str).str.replace(r"^b'|\'$", "", regex=True)
+        df["Nombre"] = df["Nombre"].astype(str).str.replace(r"^b[\'\"]|[\'\"]$", "", regex=True)
         df["Equipo"] = df["Equipo"].astype(str).str.replace(r"^\['|'\]$", "", regex=True)
         df.to_csv(out_path, index=False, sep=";")
     else:
