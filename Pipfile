@@ -9,6 +9,11 @@ selenium = "*"
 beautifulsoup4 = "*"
 pandas = "*"
 webdriver-manager = "*"
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+python-dotenv = "*"
+ipykernel = "*"
 
 [dev-packages]
 
