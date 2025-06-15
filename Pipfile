@@ -14,6 +14,7 @@ matplotlib = "*"
 seaborn = "*"
 python-dotenv = "*"
 ipykernel = "*"
+mlflow = "*"
 
 [dev-packages]
 
