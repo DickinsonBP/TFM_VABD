@@ -13,8 +13,10 @@ numpy = "*"
 matplotlib = "*"
 seaborn = "*"
 python-dotenv = "*"
-ipykernel = "*"
 mlflow = "*"
+plotly = "*"
+ipykernel = "*"
+pycaret = "*"
 
 [dev-packages]
 
