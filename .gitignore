@@ -1,4 +1,6 @@
 *.csv
 .env
 *.lock
+*.log
+*.logs
 /Modelos/mlruns
