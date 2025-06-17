@@ -16,6 +16,7 @@ python-dotenv = "*"
 ipykernel = "*"
 pycaret = "*"
 plotly = "*"
+streamlit = "*"
 
 [dev-packages]
 ipykernel = "*"

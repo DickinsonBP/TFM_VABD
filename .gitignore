@@ -1,6 +1,8 @@
 *.csv
 .env
 *.lock
+Pipfile.lock
 *.log
 *.logs
+/VISUALIZATION/logs
 /Modelos/mlruns
