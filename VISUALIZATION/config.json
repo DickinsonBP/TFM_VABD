@@ -1,0 +1,29 @@
+{
+  "LFENDESA_kmeans": [
+    {"id": "Nombre",              "label": "Nombre",              "type": "str",   "default": ""},
+    {"id": "Equipo",              "label": "Equipo",              "type": "str",   "default": ""},
+    {"id": "Partidos",            "label": "Partidos",            "type": "float", "default": 0, "min": 0},
+    {"id": "Puntos",              "label": "Puntos",              "type": "float", "default": 0, "min": 0},
+    {"id": "T2_Anotados",         "label": "T2 Anotados",         "type": "float", "default": 0, "min": 0, "model_col": "T2 Anotados"},
+    {"id": "T2_Lanzados",         "label": "T2 Lanzados",         "type": "float", "default": 0, "min": 0, "model_col": "T2 Lanzados"},
+    {"id": "Pct_T2",              "label": "% T2",                "type": "float", "default": 50.0, "min": 0, "max": 100, "step": 0.1, "model_col": "% T2"},
+    {"id": "T3_Anotados",         "label": "T3 Anotados",         "type": "float", "default": 0, "min": 0, "model_col": "T3 Anotados"},
+    {"id": "T3_Lanzados",         "label": "T3 Lanzados",         "type": "float", "default": 0, "min": 0, "model_col": "T3 Lanzados"},
+    {"id": "Pct_T3",              "label": "% T3",                "type": "float", "default": 35.0, "min": 0, "max": 100, "step": 0.1, "model_col": "% T3"},
+    {"id": "T1_Anotados",         "label": "T1 Anotados",         "type": "float", "default": 0, "min": 0, "model_col": "T1 Anotados"},
+    {"id": "T1_Lanzados",         "label": "T1 Lanzados",         "type": "float", "default": 0, "min": 0, "model_col": "T1 Lanzados"},
+    {"id": "Pct_T1",              "label": "% T1",                "type": "float", "default": 75.0, "min": 0, "max": 100, "step": 0.1, "model_col": "% T1"},
+    {"id": "Reb_Ofensivos",       "label": "Rebotes Ofensivos",   "type": "float", "default": 0, "min": 0, "model_col": "Reb_Ofensivos"},
+    {"id": "Reb_Defensivos",      "label": "Rebotes Defensivos",  "type": "float", "default": 0, "min": 0, "model_col": "Reb_Defensivos"},
+    {"id": "Rebotes",             "label": "Rebotes Totales",     "type": "float", "default": 0, "min": 0},
+    {"id": "Asistencias",         "label": "Asistencias",         "type": "float", "default": 0, "min": 0},
+    {"id": "Robos",               "label": "Robos",               "type": "float", "default": 0, "min": 0},
+    {"id": "Perdidas",            "label": "Pérdidas",            "type": "float", "default": 0, "min": 0},
+    {"id": "Tapones",             "label": "Tapones",             "type": "float", "default": 0, "min": 0},
+    {"id": "Tapones_Recibidos",   "label": "Tapones Recibidos",   "type": "float", "default": 0, "min": 0, "model_col": "Tapones Recibidos"},
+    {"id": "Mates",               "label": "Mates",               "type": "float", "default": 0, "min": 0},
+    {"id": "Faltas_Cometidas",    "label": "Faltas Cometidas",    "type": "float", "default": 0, "min": 0,"model_col": "Faltas Cometidas"},
+    {"id": "Faltas_Recibidas",    "label": "Faltas Recibidas",    "type": "float", "default": 0, "min": 0,"model_col": "Faltas Recibidas"},
+    {"id": "Valoracion",          "label": "Valoración",          "type": "float", "default": 0.0,"model_col": "Valoracion"}
+  ]
+}
