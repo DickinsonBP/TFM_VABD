@@ -33,6 +33,8 @@ MODEL_DIR = BASE_DIR / "trained_models"
 if not MODEL_DIR.exists():
     MODEL_DIR = BASE_DIR / "models"
 CONFIG_PATH = BASE_DIR / "config.json"
+DATA_PATH = BASE_DIR / "data" / "LFENDESA_UnifiedData.csv"
+
 
 # ── Perfiles de cluster ------------------------------------------------------
 
@@ -53,6 +55,17 @@ def load_config(path: Path) -> Dict[str, Any]:
 @st.cache_resource(show_spinner=False)
 def load_model(model_name: str):
     return joblib.load(MODEL_DIR / f"{model_name}.pkl")
+
+@st.cache_data(show_spinner="Cargando datos…")
+def load_players() -> pd.DataFrame:
+    df = pd.read_csv(
+        DATA_PATH, sep=";", decimal=".",  # separador «;»  :contentReference[oaicite:3]{index=3}
+        dtype={"Temporada": int, "Equipo": str, "Nombre": str}
+    )
+    # Convertir a numéricas todas las columnas salvo las 3 primeras
+    num_cols = df.columns[3:]
+    df[num_cols] = df[num_cols].apply(pd.to_numeric, errors="coerce")
+    return df
 
 # ── Side-bar inputs ----------------------------------------------------------
 
@@ -150,45 +163,235 @@ def radar_from_centroid(centroid: pd.Series, color: str, name: str) -> go.Figure
     return fig
 
 
-def show_results(result: Dict[str, Any], df: pd.DataFrame, model):
+def show_results( result: Dict[str, Any], df: pd.DataFrame, model, *, top_k: int = 5) -> None:
+    """Visualiza los resultados del modelo con gráficos adicionales.
+
+    Para el caso de **clustering** se añaden:
+    ▸ Radar chart (centroide) – ya existente.
+    ▸ Barra *Top‑k* métricas de la jugadora.
+    ▸ Comparativa Jugadora vs Centroide para esas métricas.
+    """
+
     st.subheader("Resultados")
     tipo = result["tipo"]
 
+    # ── CLUSTERING ──────────────────────────────────────────────────────────
     if tipo == "clustering":
         cid = result["cluster"]
         prof = CLUSTER_PROFILE.get(cid, {"name": "Perfil desconocido", "color": "gray"})
         st.markdown(
-            f"**Cluster asignado:** {cid} — "
-            f"<span style='color:{prof['color']}; font-weight:bold'>{prof['name']}</span>",
+            (
+                f"**Cluster asignado:** {cid} — "
+                f"<span style='color:{prof['color']}; font-weight:bold'>{prof['name']}</span>"
+            ),
             unsafe_allow_html=True,
         )
 
+        # ▸ Radar del centroide ------------------------------------------------
         if hasattr(model, "cluster_centers_"):
             centers = pd.DataFrame(model.steps[-1][-1].cluster_centers_, columns=df.columns)
             centroid = centers.loc[cid]
-            fig = radar_from_centroid(centroid, prof["color"], prof["name"])
-            st.plotly_chart(fig, use_container_width=True)
+            fig_rad = radar_from_centroid(centroid, prof["color"], prof["name"])
+            st.plotly_chart(fig_rad, use_container_width=True)
+        else:
+            centroid = None  # fallback por si no hay KMeans estándar
 
+        # ▸ Top‑k métricas de la jugadora --------------------------------------
+        numeric_metrics = df.select_dtypes(include=[np.number]).iloc[0]
+        if numeric_metrics.empty:
+            st.info("No se encontraron métricas numéricas para la jugadora.")
+            return
+
+        top_metrics = numeric_metrics.sort_values(ascending=False).head(top_k)
+        fig_bar = px.bar(
+            x=top_metrics.index,
+            y=top_metrics.values,
+            title=f"Top {top_k} métricas de la jugadora",
+            labels={"x": "Métrica", "y": "Valor"},
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+        # ▸ Comparativa Jugadora vs Centroide ----------------------------------
+        if centroid is not None:
+            common_cols = [c for c in top_metrics.index if c in centroid.index]
+            if common_cols:
+                comp_df = pd.DataFrame(
+                    {
+                        "Métrica": common_cols,
+                        "Jugadora": numeric_metrics[common_cols].values,
+                        "Centroide": centroid[common_cols].values,
+                    }
+                )
+                fig_comp = px.bar(
+                    comp_df.melt(id_vars="Métrica", var_name="Entidad", value_name="Valor"),
+                    x="Métrica",
+                    y="Valor",
+                    color="Entidad",
+                    barmode="group",
+                    title="Comparación Jugadora vs Centroide (métricas TOP)",
+                )
+                st.plotly_chart(fig_comp, use_container_width=True)
+
+    # ── CLASIFICACIÓN ────────────────────────────────────────────────────────
     elif tipo == "clasificacion":
         st.markdown(f"**Clase predicha:** {result['prediccion']}")
-        clases = result["clases"]
+        clases = result.get("clases", [])
         if clases:
             fig = px.bar(
-                pd.DataFrame({"Clase": clases, "Probabilidad": result["probabilidades"]}),
+                pd.DataFrame({
+                    "Clase": clases,
+                    "Probabilidad": result["probabilidades"],
+                }),
                 x="Clase",
                 y="Probabilidad",
                 title="Distribución de probabilidades",
             )
             st.plotly_chart(fig, use_container_width=True)
 
+    # ── REGRESIÓN ────────────────────────────────────────────────────────────
     elif tipo == "regresion":
         st.markdown(f"**Valor predicho:** {result['prediccion']:.3f}")
+
+# ── Métricas dataset ---------------------------------------------------------
+
+def show_dataset_metrics(df: pd.DataFrame, cfg: dict | None = None) -> None:
+    """Renderiza métricas descriptivas enriquecidas del *dataset*.
+
+    ▸ **Resumen estadístico** (tabla interactiva).
+    ▸ **Distribuciones**: histograma o boxplot para cualquier métrica numérica.
+    ▸ **Serie temporal**: media de una métrica por temporada.
+    ▸ **Correlaciones**: mapa de calor de Pearson entre métricas.
+    """
+
+    st.subheader("📊 Métricas generales del dataset")
+
+    # ── Selección de columnas numéricas ──────────────────────────────────────
+    num_cols = df.select_dtypes(include=[np.number]).columns
+    if num_cols.empty:
+        st.warning("No se encontraron columnas numéricas en el CSV.")
+        return
+
+    # ── Pestañas ----------------------------------------------------------------
+    tab_resumen, tab_dist, tab_serie, tab_corr = st.tabs(
+        ["Resumen", "Distribuciones", "Serie temporal", "Correlación"]
+    )
+
+    # ▸ Resumen estadístico ---------------------------------------------------
+    with tab_resumen:
+        summary = df[num_cols].describe().T  # transposed for readability
+        summary.rename(
+            columns={
+                "mean": "media",
+                "std": "std",
+                "min": "mín",
+                "25%": "q1",
+                "50%": "mediana",
+                "75%": "q3",
+                "max": "máx",
+            },
+            inplace=True,
+        )
+        st.dataframe(summary, use_container_width=True)
+
+    # ▸ Distribuciones --------------------------------------------------------
+    with tab_dist:
+        col1, col2 = st.columns(2)
+        with col1:
+            metric = st.selectbox("Variable", num_cols, index=0)
+        with col2:
+            chart_kind = st.radio("Tipo de gráfico", ["Histograma", "Boxplot"], horizontal=True)
+
+        if chart_kind == "Histograma":
+            fig = px.histogram(df, x=metric, nbins=30, title=f"Distribución de {metric}")
+        else:
+            fig = px.box(df, y=metric, points="all", title=f"Boxplot de {metric}")
+        st.plotly_chart(fig, use_container_width=True)
+
+    # ▸ Serie temporal --------------------------------------------------------
+    with tab_serie:
+        if "Temporada" in df.columns:
+            default_metric = "Puntos" if "Puntos" in num_cols else num_cols[0]
+            metric_ts = st.selectbox("Métrica", num_cols, index=num_cols.get_loc(default_metric))
+            df_ts = (
+                df.groupby("Temporada")[metric_ts].mean()
+                .reset_index()
+                .sort_values("Temporada")
+            )
+            fig = px.line(
+                df_ts,
+                x="Temporada",
+                y=metric_ts,
+                markers=True,
+                title=f"Evolución de {metric_ts} por temporada",
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("La columna 'Temporada' no está disponible para serie temporal.")
+
+    # ▸ Correlación -----------------------------------------------------------
+    with tab_corr:
+        corr = df[num_cols].corr().round(2)
+        fig = px.imshow(
+            corr,
+            text_auto=True,
+            aspect="auto",
+            color_continuous_scale="RdBu",
+            title="Matriz de correlación (Pearson)",
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    
+# ── Predicción (contenido de la pestaña) ------------------------------------
+
+def show_prediction_ui(cfg: Dict[str, Any]):
+    model_names = sorted(cfg.keys())
+    if not model_names:
+        st.warning("No hay modelos definidos en config.json")
+        return
+
+    st.sidebar.header("⚙️ Configuración")
+    model_choice = st.sidebar.selectbox("Selecciona un modelo", model_names, index=0)
+
+    metric_defs = cfg[model_choice]
+    st.sidebar.subheader("🔢 Métricas de entrada")
+    input_vals = build_sidebar_inputs(metric_defs)
+
+    run_btn = st.sidebar.button("🚀 Ejecutar modelo", use_container_width=True)
+    st.sidebar.markdown("---")
+    st.sidebar.caption(
+        "Define 'model_col' en config.json si el nombre real difiere del mostrado.")
+
+    if run_btn:
+        row = {
+            (m.get("model_col") or m["id"].replace("_", " ")): input_vals[m["id"]]
+            for m in metric_defs
+        }
+        df = pd.DataFrame([row])
+
+        model_path = MODEL_DIR / f"{model_choice}.pkl"
+        if not model_path.exists():
+            st.error(f"No se encontró {model_path.relative_to(BASE_DIR)}")
+            return
+        model = load_model(model_choice)
+
+        # Re-ordenar columnas si el modelo lo requiere
+        if hasattr(model, "feature_names_in_"):
+            missing = [c for c in model.feature_names_in_ if c not in df.columns]
+            if missing:
+                st.error(f"Faltan columnas requeridas: {missing}.")
+                return
+            df = df[model.feature_names_in_]
+
+        df = ensure_float32(df)
+        res = run_inference(model, df)
+        show_results(res, df, model)
+    else:
+        st.info("Rellena las métricas y pulsa **Ejecutar modelo** para ver resultados.")
 
 # ── Main ---------------------------------------------------------------------
 
 def main():
-    st.set_page_config(page_title="ML Playground", layout="wide")
-    st.title("🧪 ML Playground – Tus modelos PyCaret al instante")
+    st.set_page_config(page_title="🏀", layout="wide")
+    st.title("🏀 Preddición de Rendimiento y Resultados en Baloncesto")
 
     if not CONFIG_PATH.exists():
         st.error("No se encontró config.json. Revisa la ruta.")
@@ -199,6 +402,9 @@ def main():
     except json.JSONDecodeError as e:
         st.error(f"Error de sintaxis en config.json: {e}")
         st.stop()
+        
+    # Cargar dataset completo una sola vez (para la pestaña de métricas)
+    df_dataset = load_players()
 
     model_names = sorted(cfg.keys())
     if not model_names:
@@ -207,43 +413,51 @@ def main():
 
     # Sidebar --------------------------------------------------------------
     st.sidebar.header("⚙️ Configuración")
-    model_choice = st.sidebar.selectbox("Selecciona un modelo", model_names, index=0)
-
-    metric_defs = cfg[model_choice]
-    st.sidebar.subheader("🔢 Métricas de entrada")
-    input_vals = build_sidebar_inputs(metric_defs)
-
-    run_btn = st.sidebar.button("🚀 Ejecutar modelo", use_container_width=True)
-    st.sidebar.markdown("---")
-    st.sidebar.caption("Define 'model_col' en config.json si el nombre real difiere del mostrado.")
-
-    st.markdown("---")
-
-    if run_btn:
-        row: Dict[str, Any] = {}
-        for m in metric_defs:
-            row[m.get("model_col") or m["id"].replace("_", " ")] = input_vals[m["id"]]
-
-        df = pd.DataFrame([row])
-        model_path = MODEL_DIR / f"{model_choice}.pkl"
-        if not model_path.exists():
-            st.error(f"No se encontró {model_path.relative_to(BASE_DIR)}")
-            st.stop()
-        model = load_model(model_choice)
-
-        if hasattr(model, "feature_names_in_"):
-            missing = [c for c in model.feature_names_in_ if c not in df.columns]
-            if missing:
-                st.error(f"Faltan columnas requeridas: {missing}.")
-                st.stop()
-            df = df[model.feature_names_in_]
-
-        df = ensure_float32(df)
-
-        res = run_inference(model, df)
-        show_results(res, df, model)
+    metrics_label = "📊 Métricas dataset"
+    options = [metrics_label] + model_names
+    
+    selection = st.sidebar.selectbox("Selecciona un modelo", options, index=0)
+    if selection == metrics_label:
+        # Ocultar elementos de entrada innecesarios en la sidebar
+        st.sidebar.markdown("---")
+        st.sidebar.caption("Las métricas del dataset no requieren entradas.")
+        show_dataset_metrics(df_dataset, cfg)
     else:
-        st.info("Rellena las métricas y pulsa **Ejecutar modelo** para ver resultados.")
+        metric_defs = cfg[selection]
+        st.sidebar.subheader("🔢 Métricas de entrada")
+        input_vals = build_sidebar_inputs(metric_defs)
+
+        run_btn = st.sidebar.button("🚀 Ejecutar modelo", use_container_width=True)
+        st.sidebar.markdown("---")
+        st.sidebar.caption("Define 'model_col' en config.json si el nombre real difiere del mostrado.")
+
+        st.markdown("---")
+
+        if run_btn:
+            row: Dict[str, Any] = {}
+            for m in metric_defs:
+                row[m.get("model_col") or m["id"].replace("_", " ")] = input_vals[m["id"]]
+
+            df = pd.DataFrame([row])
+            model_path = MODEL_DIR / f"{selection}.pkl"
+            if not model_path.exists():
+                st.error(f"No se encontró {model_path.relative_to(BASE_DIR)}")
+                st.stop()
+            model = load_model(selection)
+
+            if hasattr(model, "feature_names_in_"):
+                missing = [c for c in model.feature_names_in_ if c not in df.columns]
+                if missing:
+                    st.error(f"Faltan columnas requeridas: {missing}.")
+                    st.stop()
+                df = df[model.feature_names_in_]
+
+            df = ensure_float32(df)
+
+            res = run_inference(model, df)
+            show_results(res, df, model)
+        else:
+            st.info("Rellena las métricas y pulsa **Ejecutar modelo** para ver resultados.")
 
 if __name__ == "__main__":
     main()
