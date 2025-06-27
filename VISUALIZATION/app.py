@@ -343,15 +343,25 @@ def show_dataset_metrics(df: pd.DataFrame, cfg: dict | None = None) -> None:
 # ── Predicción (contenido de la pestaña) ------------------------------------
 
 def show_prediction_ui(cfg: Dict[str, Any]):
-    model_names = sorted(cfg.keys())
-    if not model_names:
+    # Crear el mapeo: nombre mostrado → clave interna
+    model_display_map = {
+        v["Model Name"]: k
+        for k, v in cfg.items()
+        if "Model Name" in v
+    }
+    model_display_names = list(model_display_map.keys())
+    
+    if not model_display_names:
         st.warning("No hay modelos definidos en config.json")
         return
 
     st.sidebar.header("⚙️ Configuración")
-    model_choice = st.sidebar.selectbox("Selecciona un modelo", model_names, index=0)
+    # Mostrar el nombre bonito en el selector
+    model_choice_display = st.sidebar.selectbox("Selecciona un modelo", model_display_names, index=0)
+    # Obtener la clave interna real
+    model_choice = model_display_map[model_choice_display]
 
-    metric_defs = cfg[model_choice]
+    metric_defs = cfg[model_choice]["Metrics"]
     st.sidebar.subheader("🔢 Métricas de entrada")
     input_vals = build_sidebar_inputs(metric_defs)
 
@@ -405,16 +415,23 @@ def main():
         
     # Cargar dataset completo una sola vez (para la pestaña de métricas)
     df_dataset = load_players()
+    metrics_label = "📊 Métricas dataset"
+    model_display_map = {
+        v["Model Name"]: k
+        for k, v in cfg.items()
+        if "Model Name" in v
+    } 
+    
+    model_names = [metrics_label] + list(model_display_map.keys())
 
-    model_names = sorted(cfg.keys())
     if not model_names:
         st.warning("No hay modelos definidos en config.json")
         st.stop()
 
     # Sidebar --------------------------------------------------------------
     st.sidebar.header("⚙️ Configuración")
-    metrics_label = "📊 Métricas dataset"
-    options = [metrics_label] + model_names
+    
+    options = model_names
     
     selection = st.sidebar.selectbox("Selecciona un modelo", options, index=0)
     if selection == metrics_label:
@@ -423,7 +440,8 @@ def main():
         st.sidebar.caption("Las métricas del dataset no requieren entradas.")
         show_dataset_metrics(df_dataset, cfg)
     else:
-        metric_defs = cfg[selection]
+        model_key = model_display_map[selection]
+        metric_defs = cfg[model_key]["Metrics"]
         st.sidebar.subheader("🔢 Métricas de entrada")
         input_vals = build_sidebar_inputs(metric_defs)
 
@@ -439,11 +457,11 @@ def main():
                 row[m.get("model_col") or m["id"].replace("_", " ")] = input_vals[m["id"]]
 
             df = pd.DataFrame([row])
-            model_path = MODEL_DIR / f"{selection}.pkl"
+            model_path = MODEL_DIR / f"{model_key}.pkl"
             if not model_path.exists():
                 st.error(f"No se encontró {model_path.relative_to(BASE_DIR)}")
                 st.stop()
-            model = load_model(selection)
+            model = load_model(model_key)
 
             if hasattr(model, "feature_names_in_"):
                 missing = [c for c in model.feature_names_in_ if c not in df.columns]

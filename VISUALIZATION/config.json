@@ -1,5 +1,7 @@
 {
-  "LFENDESA_kmeans": [
+  "LFENDESA_Kmeans": {
+    "Model Name" : "🏀Predicción de perfil de jugadora🏀",
+    "Metrics" : [
     {"id": "Nombre",              "label": "Nombre",              "type": "str",   "default": ""},
     {"id": "Equipo",              "label": "Equipo",              "type": "str",   "default": ""},
     {"id": "Partidos",            "label": "Partidos",            "type": "float", "default": 0, "min": 0},
@@ -25,5 +27,10 @@
     {"id": "Faltas_Cometidas",    "label": "Faltas Cometidas",    "type": "float", "default": 0, "min": 0,"model_col": "Faltas Cometidas"},
     {"id": "Faltas_Recibidas",    "label": "Faltas Recibidas",    "type": "float", "default": 0, "min": 0,"model_col": "Faltas Recibidas"},
     {"id": "Valoracion",          "label": "Valoración",          "type": "float", "default": 0.0,"model_col": "Valoracion"}
-  ]
+  ]},
+  "LFENDESA_Clasification" : {
+    "Model Name" : "🏀Clasificación por nivel de rendimiento 🏀",
+    "Metrics" :
+    []
+  }
 }
