@@ -1,4 +1,3 @@
-*.csv
 .env
 *.lock
 Pipfile.lock
