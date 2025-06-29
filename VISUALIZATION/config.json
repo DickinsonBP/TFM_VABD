@@ -31,6 +31,19 @@
   "LFENDESA_Clasification" : {
     "Model Name" : "🏀Clasificación por nivel de rendimiento 🏀",
     "Metrics" :
-    []
+    [
+      {"id": "Nombre",              "label": "Nombre",              "type": "str",   "default": ""},
+      {"id": "Equipo",              "label": "Equipo",              "type": "str",   "default": ""},
+      {"id": "Minutos",             "label": "Minutos",             "type": "float", "default": 0, "min": 0},
+      {"id": "Puntos",              "label": "Puntos",              "type": "float", "default": 0, "min": 0},
+      {"id": "Rebotes",             "label": "Rebotes Totales",     "type": "float", "default": 0, "min": 0},
+      {"id": "Asistencias",         "label": "Asistencias",         "type": "float", "default": 0, "min": 0},
+      {"id": "Robos",               "label": "Robos",               "type": "float", "default": 0, "min": 0},
+      {"id": "Perdidas",            "label": "Pérdidas",            "type": "float", "default": 0, "min": 0},
+      {"id": "Faltas Cometidas",    "label": "Faltas Cometidas",    "type": "float", "default": 0, "min": 0,"model_col": "Faltas Cometidas"},
+      {"id": "Faltas Recibidas",    "label": "Faltas Recibidas",    "type": "float", "default": 0, "min": 0,"model_col": "Faltas Recibidas"},
+      {"id": "Eficiencia Ofensiva", "label": "Eficiencia Ofensiva", "type": "float", "default": 0, "min": 0},
+      {"id": "Eficiencia Defensiva", "label": "Eficiencia Defensiva", "type": "float", "default": 0, "min": 0}
+    ]
   }
 }

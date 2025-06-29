@@ -163,17 +163,14 @@ def radar_from_centroid(centroid: pd.Series, color: str, name: str) -> go.Figure
     return fig
 
 
-def show_results( result: Dict[str, Any], df: pd.DataFrame, model, *, top_k: int = 5) -> None:
-    """Visualiza los resultados del modelo con gráficos adicionales.
+def show_results(name: str, team:str, result: Dict[str, Any], df: pd.DataFrame, model, *, top_k: int = 5) -> None:
+    if name or team:
+        st.subheader(f"Resultados 🤖 {name} &nbsp;&nbsp;|&nbsp;&nbsp;**Equipo:** {team}")
+    else:
+        st.subheader("Resultados")
 
-    Para el caso de **clustering** se añaden:
-    ▸ Radar chart (centroide) – ya existente.
-    ▸ Barra *Top‑k* métricas de la jugadora.
-    ▸ Comparativa Jugadora vs Centroide para esas métricas.
-    """
-
-    st.subheader("Resultados")
     tipo = result["tipo"]
+
 
     # ── CLUSTERING ──────────────────────────────────────────────────────────
     if tipo == "clustering":
@@ -234,18 +231,31 @@ def show_results( result: Dict[str, Any], df: pd.DataFrame, model, *, top_k: int
 
     # ── CLASIFICACIÓN ────────────────────────────────────────────────────────
     elif tipo == "clasificacion":
-        st.markdown(f"**Clase predicha:** {result['prediccion']}")
+        # Mapeo de clase a etiqueta
+        class_labels = {0: "Bajo", 1: "Medio", 2: "Alto"}
+        pred = result['prediccion']
         clases = result.get("clases", [])
+        probabilidades = result.get("probabilidades", [])
+
+        # Si las clases son ints, mapea a etiquetas
+        clase_predicha = class_labels.get(pred, str(pred))
+
+        st.markdown(f"**Clase predicha:** {clase_predicha}")
+
         if clases:
-            fig = px.bar(
+            # Mapea las clases a etiquetas para el gráfico
+            etiquetas = [class_labels.get(c, str(c)) for c in clases]
+            fig = px.pie(
                 pd.DataFrame({
-                    "Clase": clases,
-                    "Probabilidad": result["probabilidades"],
+                    "Clase": etiquetas,
+                    "Probabilidad": probabilidades,
                 }),
-                x="Clase",
-                y="Probabilidad",
-                title="Distribución de probabilidades",
+                names="Clase",
+                values="Probabilidad",
+                title=f"Distribución de probabilidades (Clase predicha: {clase_predicha})",
+                color_discrete_sequence=px.colors.qualitative.Pastel
             )
+            fig.update_traces(textinfo='percent+label')
             st.plotly_chart(fig, use_container_width=True)
 
     # ── REGRESIÓN ────────────────────────────────────────────────────────────
@@ -339,69 +349,12 @@ def show_dataset_metrics(df: pd.DataFrame, cfg: dict | None = None) -> None:
             title="Matriz de correlación (Pearson)",
         )
         st.plotly_chart(fig, use_container_width=True)
-    
-# ── Predicción (contenido de la pestaña) ------------------------------------
-
-def show_prediction_ui(cfg: Dict[str, Any]):
-    # Crear el mapeo: nombre mostrado → clave interna
-    model_display_map = {
-        v["Model Name"]: k
-        for k, v in cfg.items()
-        if "Model Name" in v
-    }
-    model_display_names = list(model_display_map.keys())
-    
-    if not model_display_names:
-        st.warning("No hay modelos definidos en config.json")
-        return
-
-    st.sidebar.header("⚙️ Configuración")
-    # Mostrar el nombre bonito en el selector
-    model_choice_display = st.sidebar.selectbox("Selecciona un modelo", model_display_names, index=0)
-    # Obtener la clave interna real
-    model_choice = model_display_map[model_choice_display]
-
-    metric_defs = cfg[model_choice]["Metrics"]
-    st.sidebar.subheader("🔢 Métricas de entrada")
-    input_vals = build_sidebar_inputs(metric_defs)
-
-    run_btn = st.sidebar.button("🚀 Ejecutar modelo", use_container_width=True)
-    st.sidebar.markdown("---")
-    st.sidebar.caption(
-        "Define 'model_col' en config.json si el nombre real difiere del mostrado.")
-
-    if run_btn:
-        row = {
-            (m.get("model_col") or m["id"].replace("_", " ")): input_vals[m["id"]]
-            for m in metric_defs
-        }
-        df = pd.DataFrame([row])
-
-        model_path = MODEL_DIR / f"{model_choice}.pkl"
-        if not model_path.exists():
-            st.error(f"No se encontró {model_path.relative_to(BASE_DIR)}")
-            return
-        model = load_model(model_choice)
-
-        # Re-ordenar columnas si el modelo lo requiere
-        if hasattr(model, "feature_names_in_"):
-            missing = [c for c in model.feature_names_in_ if c not in df.columns]
-            if missing:
-                st.error(f"Faltan columnas requeridas: {missing}.")
-                return
-            df = df[model.feature_names_in_]
-
-        df = ensure_float32(df)
-        res = run_inference(model, df)
-        show_results(res, df, model)
-    else:
-        st.info("Rellena las métricas y pulsa **Ejecutar modelo** para ver resultados.")
 
 # ── Main ---------------------------------------------------------------------
 
 def main():
     st.set_page_config(page_title="🏀", layout="wide")
-    st.title("🏀 Preddición de Rendimiento y Resultados en Baloncesto")
+    st.title("🏀 Predición de Rendimiento y Resultados en Baloncesto")
 
     if not CONFIG_PATH.exists():
         st.error("No se encontró config.json. Revisa la ruta.")
@@ -444,7 +397,9 @@ def main():
         metric_defs = cfg[model_key]["Metrics"]
         st.sidebar.subheader("🔢 Métricas de entrada")
         input_vals = build_sidebar_inputs(metric_defs)
-
+        nombre = input_vals['Nombre']
+        equipo = input_vals['Equipo']
+        
         run_btn = st.sidebar.button("🚀 Ejecutar modelo", use_container_width=True)
         st.sidebar.markdown("---")
         st.sidebar.caption("Define 'model_col' en config.json si el nombre real difiere del mostrado.")
@@ -473,7 +428,7 @@ def main():
             df = ensure_float32(df)
 
             res = run_inference(model, df)
-            show_results(res, df, model)
+            show_results(nombre, equipo, res, df, model)
         else:
             st.info("Rellena las métricas y pulsa **Ejecutar modelo** para ver resultados.")
 
